@@ -138,87 +138,27 @@
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (file && file.type === 'application/pdf') {
-                const reader = new FileReader();
-                reader.onload = function() {
-                    const typedArray = new Uint8Array(reader.result);
-                    pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
-                        pdfDoc = pdf;
-                        renderPage(currentPage);
-                    });
-                };
-                reader.readAsArrayBuffer(file);
+                const formData = new FormData();
+                formData.append("pdfUpload", file);
+
+                fetch("/upload_pdf", {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    document.getElementById('invoiceNumber').value = data.invoice_number;
+                    document.getElementById('invoiceDate').value = data.invoice_date;
+                    document.getElementById('vendorName').value = data.vendor_name;
+                    document.getElementById('vendorAddress').value = data.vendor_address;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
             } else {
                 alert('Please upload a valid PDF file.');
             }
-        }
-
-        // Render PDF page
-        function renderPage(pageNum) {
-            pdfDoc.getPage(pageNum).then(function(page) {
-                const scale = 1.5;
-                const viewport = page.getViewport({ scale: scale });
-                const canvas = document.getElementById('pdf-canvas');
-                const context = canvas.getContext('2d');
-
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-
-                page.render({
-                    canvasContext: context,
-                    viewport: viewport
-                });
-
-                renderTextLayer(page, viewport);
-            });
-        }
-
-        // Render the text layer (so text is selectable)
-        function renderTextLayer(page, viewport) {
-            page.getTextContent().then(function(textContent) {
-                const textLayer = document.getElementById('text-layer');
-                textLayer.innerHTML = ""; // Clear existing text
-
-                const fragment = document.createDocumentFragment();
-                textContent.items.forEach(function(item) {
-                    const div = document.createElement('div');
-                    div.textContent = item.str;
-                    div.style.position = 'absolute';
-                    div.style.left = item.transform[4] + 'px';
-                    div.style.top = (viewport.height - item.transform[5]) + 'px'; // Adjust for top position
-                    div.style.fontSize = item.height + 'px';
-                    div.style.fontFamily = 'sans-serif';
-                    div.style.whiteSpace = 'nowrap';
-                    div.style.pointerEvents = 'none'; // To make it non-interactive
-                    fragment.appendChild(div);
-                });
-
-                textLayer.appendChild(fragment);
-            });
-        }
-
-        // Listen for text selection
-        document.getElementById('pdf-canvas').addEventListener('mouseup', function(event) {
-            const selectedText = window.getSelection().toString();
-            if (selectedText) {
-                extractInvoiceDetails(selectedText);
-            }
-        });
-
-        // Simulate form population from selected text
-        function extractInvoiceDetails(selectedText) {
-            if (selectedText.includes('Invoice Number')) {
-                document.getElementById('invoiceNumber').value = selectedText.trim();
-            }
-            if (selectedText.includes('Invoice Date')) {
-                document.getElementById('invoiceDate').value = selectedText.trim();
-            }
-            if (selectedText.includes('Vendor Name')) {
-                document.getElementById('vendorName').value = selectedText.trim();
-            }
-            if (selectedText.includes('Vendor Address')) {
-                document.getElementById('vendorAddress').value = selectedText.trim();
-            }
-            // Add other fields based on selected text
         }
     </script>
 </body>
