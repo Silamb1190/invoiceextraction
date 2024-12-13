@@ -23,10 +23,21 @@
             width: 50%;
             height: 600px;
             overflow: auto;
+            position: relative;
             border-left: 2px solid #ddd;
         }
         #pdf-canvas {
             border: 1px solid #ddd;
+            display: block;
+        }
+        .text-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            font-family: sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
         }
         .form-group {
             margin-bottom: 15px;
@@ -114,6 +125,7 @@
         <div class="pdf-container">
             <h2>Invoice PDF</h2>
             <canvas id="pdf-canvas"></canvas>
+            <div id="text-layer" class="text-layer"></div>
         </div>
     </div>
 
@@ -121,7 +133,6 @@
     <script>
         let pdfDoc = null;
         let currentPage = 1;
-        let pdfText = "";
 
         // PDF upload and rendering
         function handleFileSelect(event) {
@@ -133,7 +144,6 @@
                     pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
                         pdfDoc = pdf;
                         renderPage(currentPage);
-                        extractTextFromPDF(pdf);
                     });
                 };
                 reader.readAsArrayBuffer(file);
@@ -157,49 +167,59 @@
                     canvasContext: context,
                     viewport: viewport
                 });
+
+                renderTextLayer(page, viewport);
             });
         }
 
-        // Extract text from the PDF
-        function extractTextFromPDF(pdf) {
-            let textContent = "";
-            for (let i = 1; i <= pdf.numPages; i++) {
-                pdf.getPage(i).then(function(page) {
-                    page.getTextContent().then(function(text) {
-                        text.items.forEach(function(item) {
-                            textContent += item.str + " ";
-                        });
-                        // Once text extraction is complete, store the result
-                        pdfText = textContent;
-                    });
+        // Render the text layer (so text is selectable)
+        function renderTextLayer(page, viewport) {
+            page.getTextContent().then(function(textContent) {
+                const textLayer = document.getElementById('text-layer');
+                textLayer.innerHTML = ""; // Clear existing text
+
+                const fragment = document.createDocumentFragment();
+                textContent.items.forEach(function(item) {
+                    const div = document.createElement('div');
+                    div.textContent = item.str;
+                    div.style.position = 'absolute';
+                    div.style.left = item.transform[4] + 'px';
+                    div.style.top = (viewport.height - item.transform[5]) + 'px'; // Adjust for top position
+                    div.style.fontSize = item.height + 'px';
+                    div.style.fontFamily = 'sans-serif';
+                    div.style.whiteSpace = 'nowrap';
+                    div.style.pointerEvents = 'none'; // To make it non-interactive
+                    fragment.appendChild(div);
                 });
-            }
+
+                textLayer.appendChild(fragment);
+            });
         }
 
-        // Simulate text selection and form population (for demo purposes)
-        function extractInvoiceDetails(selectedText) {
-            // Example of extracting fields (you can adjust logic based on the selected text)
-            if (selectedText.includes('Invoice Number')) {
-                document.getElementById('invoiceNumber').value = "INV-12345";
-            }
-            if (selectedText.includes('Invoice Date')) {
-                document.getElementById('invoiceDate').value = "2024-12-13";
-            }
-            if (selectedText.includes('Vendor Name')) {
-                document.getElementById('vendorName').value = "Vendor Name";
-            }
-            if (selectedText.includes('Vendor Address')) {
-                document.getElementById('vendorAddress').value = "123 Vendor St.";
-            }
-        }
-
-        // Listen for selection changes
+        // Listen for text selection
         document.getElementById('pdf-canvas').addEventListener('mouseup', function(event) {
             const selectedText = window.getSelection().toString();
             if (selectedText) {
                 extractInvoiceDetails(selectedText);
             }
         });
+
+        // Simulate form population from selected text
+        function extractInvoiceDetails(selectedText) {
+            if (selectedText.includes('Invoice Number')) {
+                document.getElementById('invoiceNumber').value = selectedText.trim();
+            }
+            if (selectedText.includes('Invoice Date')) {
+                document.getElementById('invoiceDate').value = selectedText.trim();
+            }
+            if (selectedText.includes('Vendor Name')) {
+                document.getElementById('vendorName').value = selectedText.trim();
+            }
+            if (selectedText.includes('Vendor Address')) {
+                document.getElementById('vendorAddress').value = selectedText.trim();
+            }
+            // Add other fields based on selected text
+        }
     </script>
 </body>
 </html>
